@@ -40,6 +40,6 @@ def run_commit():
 
     except subprocess.CalledProcessError:
         print("\nGit command failed.")
-
+    #wwww
     except FileNotFoundError:
         print("\nGit is not installed or not in PATH.")
