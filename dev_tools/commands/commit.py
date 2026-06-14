@@ -1,21 +1,55 @@
 import subprocess
+from pathlib import Path
 
 
 def run_commit():
     try:
-        print("\n=== Git Status ===\n")
+        # Repository name
+        repo_path = subprocess.check_output(
+            ["git", "rev-parse", "--show-toplevel"],
+            text=True
+        ).strip()
 
-        subprocess.run(
-            ["git", "status"],
-            check=True
-        )
+        repo_name = Path(repo_path).name
+
+        # Current branch
+        branch = subprocess.check_output(
+            ["git", "branch", "--show-current"],
+            text=True
+        ).strip()
+
+        # Changed files
+        changes = subprocess.check_output(
+            ["git", "status", "--short"],
+            text=True
+        ).strip()
+
+        print("\n" + "=" * 50)
+        print(f"Repository : {repo_name}")
+        print(f"Branch     : {branch}")
+        print("=" * 50)
+
+        if not changes:
+            print("\nNo changes detected.")
+            return
+
+        print("\nChanged Files:\n")
+        print(changes)
+
+        continue_choice = input(
+            "\nContinue with commit? (y/n): "
+        ).strip().lower()
+
+        if continue_choice != "y":
+            print("\nCommit cancelled.")
+            return
 
         commit_message = input(
             "\nEnter commit message: "
         ).strip()
 
         if not commit_message:
-            print("Commit message cannot be empty.")
+            print("\nCommit message cannot be empty.")
             return
 
         print("\nRunning git add .")
@@ -24,22 +58,33 @@ def run_commit():
             check=True
         )
 
-        print("\nRunning git commit")
+        print("Running git commit")
         subprocess.run(
             ["git", "commit", "-m", commit_message],
             check=True
         )
 
-        print("\nRunning git push")
-        subprocess.run(
-            ["git", "push"],
-            check=True
+        # Check if remote exists
+        remote = subprocess.run(
+            ["git", "remote"],
+            capture_output=True,
+            text=True
         )
 
-        print("\nCommit successful.")
+        if remote.stdout.strip():
+            print("Running git push")
+            subprocess.run(
+                ["git", "push"],
+                check=True
+            )
+            print("\nCommit and push successful.")
+        else:
+            print(
+                "\nCommit successful. No remote configured, skipping push."
+            )
 
-    except subprocess.CalledProcessError:
-        print("\nGit command failed.")
-    #wwww
+    except subprocess.CalledProcessError as e:
+        print(f"\nGit command failed: {e}")
+
     except FileNotFoundError:
         print("\nGit is not installed or not in PATH.")
