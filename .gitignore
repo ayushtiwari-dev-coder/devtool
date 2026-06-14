@@ -1,0 +1,8 @@
+devtool.egg-info
+pycache/*.pyc*.pyo*.pyd
+
+.venv/venv/
+build/dist/
+
+.vscode/
+.env.env.*
