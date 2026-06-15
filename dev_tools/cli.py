@@ -28,20 +28,26 @@ COMMANDS = {
 }
 
 def main():
-    # If no arguments provided, launch the interactive menu
-    if len(sys.argv) < 2:
-        main_menu()
-        return
+    try:
+        if len(sys.argv) < 2:
+            main_menu()
+            return
 
-    # Direct command execution
-    command = sys.argv[1].lower()
-    func = COMMANDS.get(command)
-    
-    if func:
-        func()
-    else:
-        print(f"Unknown command: {command}")
-        print("Available commands:", ", ".join(COMMANDS.keys()))
+        command = sys.argv[1].lower()
+        func = COMMANDS.get(command)
+        
+        if func:
+            func()
+        else:
+            print(f"Unknown command: {command}")
+            print("Available commands:", ", ".join(COMMANDS.keys()))
+            
+    except KeyboardInterrupt:
+        print("\n\nOperation cancelled. Exiting DevTool...")
+        sys.exit(0)
+    except Exception as e:
+        print(f"\n[DevTool Error] An unexpected error occurred: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
