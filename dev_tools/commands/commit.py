@@ -4,7 +4,6 @@ from pathlib import Path
 
 def run_commit():
     try:
-        print("new_version")
         # Repository name
         repo_path = subprocess.check_output(
             ["git", "rev-parse", "--show-toplevel"],
@@ -78,7 +77,6 @@ def run_commit():
             )
             return
 
-        # Check if current branch has an upstream
         try:
             subprocess.check_output(
                 [
