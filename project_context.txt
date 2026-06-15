@@ -1,0 +1,770 @@
+============================================================
+FILE: test.py
+============================================================
+
+from dev_tools.creation_engine.creator_structure import (
+    build_structure
+)
+
+structure = {
+    "database": [
+        {
+            "name": "connection.py"
+        },
+        {
+            "name": "sql_handler.py"
+        }
+    ],
+    "routes": [
+        {
+            "name": "user_routes.py"
+        }
+    ]
+}
+
+build_structure(structure)
+
+============================================================
+FILE: dev_tools\cli.py
+============================================================
+
+import sys
+
+# Command imports for direct execution
+from dev_tools.commands.commit import run_commit
+from dev_tools.commands.switch import run_switch
+from dev_tools.commands.create_branch import run_create_branch
+
+from dev_tools.creation_engine.creator_controller import (
+    run_folder_mode,
+    run_structure_mode,
+    run_template_mode
+)
+
+from dev_tools.utilities.bundler import run_bundle
+
+# Interactive Menu import
+from dev_tools.menus.main_menu import main_menu
+
+# Command Map for direct CLI execution
+COMMANDS = {
+    "commit": run_commit,
+    "switch": run_switch,
+    "new-branch": run_create_branch,
+    "folder": run_folder_mode,
+    "structure": run_structure_mode,
+    "template": run_template_mode,
+    "bundle": run_bundle
+}
+
+def main():
+    # If no arguments provided, launch the interactive menu
+    if len(sys.argv) < 2:
+        main_menu()
+        return
+
+    # Direct command execution
+    command = sys.argv[1].lower()
+    func = COMMANDS.get(command)
+    
+    if func:
+        func()
+    else:
+        print(f"Unknown command: {command}")
+        print("Available commands:", ", ".join(COMMANDS.keys()))
+
+if __name__ == "__main__":
+    main()
+
+============================================================
+FILE: dev_tools\__init__.py
+============================================================
+
+
+
+============================================================
+FILE: dev_tools\commands\commit.py
+============================================================
+
+import subprocess
+from pathlib import Path
+
+
+def run_commit():
+    try:
+        # Repository name
+        repo_path = subprocess.check_output(
+            ["git", "rev-parse", "--show-toplevel"],
+            text=True
+        ).strip()
+
+        repo_name = Path(repo_path).name
+
+        # Current branch
+        branch = subprocess.check_output(
+            ["git", "branch", "--show-current"],
+            text=True
+        ).strip()
+
+        # Changed files
+        changes = subprocess.check_output(
+            ["git", "status", "--short"],
+            text=True
+        ).strip()
+
+        print("\n" + "=" * 50)
+        print(f"Repository : {repo_name}")
+        print(f"Branch     : {branch}")
+        print("=" * 50)
+
+        if not changes:
+            print("\nNo changes detected.")
+            return
+
+        print("\nChanged Files:\n")
+        print(changes)
+
+        continue_choice = input(
+            "\nContinue with commit? (y/n): "
+        ).strip().lower()
+
+        if continue_choice != "y":
+            print("\nCommit cancelled.")
+            return
+
+        commit_message = input(
+            "\nEnter commit message: "
+        ).strip()
+
+        if not commit_message:
+            print("\nCommit message cannot be empty.")
+            return
+
+        print("\nRunning git add .")
+        subprocess.run(
+            ["git", "add", "."],
+            check=True
+        )
+
+        print("Running git commit")
+        subprocess.run(
+            ["git", "commit", "-m", commit_message],
+            check=True
+        )
+
+        # Check if remote exists
+        remote = subprocess.run(
+            ["git", "remote"],
+            capture_output=True,
+            text=True
+        )
+
+        if not remote.stdout.strip():
+            print(
+                "\nCommit successful. No remote configured, skipping push."
+            )
+            return
+
+        try:
+            subprocess.check_output(
+                [
+                    "git",
+                    "rev-parse",
+                    "--abbrev-ref",
+                    "--symbolic-full-name",
+                    "@{u}"
+                ],
+                stderr=subprocess.DEVNULL,
+                text=True
+            )
+
+            has_upstream = True
+
+        except subprocess.CalledProcessError:
+            has_upstream = False
+
+        if has_upstream:
+            print("Running git push")
+
+            subprocess.run(
+                ["git", "push"],
+                check=True
+            )
+
+        else:
+            print(
+                f"First push detected for branch '{branch}'."
+            )
+            print(
+                f"Running: git push -u origin {branch}"
+            )
+
+            subprocess.run(
+                [
+                    "git",
+                    "push",
+                    "-u",
+                    "origin",
+                    branch
+                ],
+                check=True
+            )
+
+        print("\nCommit and push successful.")
+
+    except subprocess.CalledProcessError as e:
+        print(f"\nGit command failed: {e}")
+
+    except FileNotFoundError:
+        print("\nGit is not installed or not in PATH.")
+
+============================================================
+FILE: dev_tools\commands\create_branch.py
+============================================================
+
+import subprocess
+
+
+def run_create_branch():
+    try:
+        branches = subprocess.check_output(
+            ["git", "branch"],
+            text=True
+        ).splitlines()
+
+        existing_branches = []
+
+        for branch in branches:
+            branch_name = branch.replace("*", "").strip()
+            existing_branches.append(branch_name)
+
+        while True:
+            branch_name = input(
+                "\nEnter branch name or type 'exit': "
+            ).strip()
+
+            if branch_name.lower() == "exit":
+                return
+
+            if not branch_name:
+                print(
+                    "\nBranch name cannot be empty."
+                )
+                continue
+
+            if " " in branch_name:
+                print(
+                    "\nBranch names cannot contain spaces."
+                )
+                continue
+
+            if branch_name in existing_branches:
+                print(
+                    f"\nBranch '{branch_name}' already exists."
+                )
+                continue
+
+            break
+
+        print(
+            f"\nCreating and switching to '{branch_name}'..."
+        )
+
+        subprocess.run(
+            ["git", "switch", "-c", branch_name],
+            check=True
+        )
+
+        print(
+            f"\nCreated and switched to '{branch_name}'."
+        )
+
+    except subprocess.CalledProcessError as e:
+        print(f"\nGit command failed: {e}")
+
+    except FileNotFoundError:
+        print("\nGit is not installed or not in PATH.")
+
+============================================================
+FILE: dev_tools\commands\switch.py
+============================================================
+
+import subprocess
+
+
+def run_switch():
+    try:
+        branches = subprocess.check_output(
+            ["git", "branch"],
+            text=True
+        ).splitlines()
+
+        clean_branches = []
+        current_branch = None
+
+        print("\nAvailable Branches:\n")
+
+        for index, branch in enumerate(branches, start=1):
+            branch_name = branch.replace("*", "").strip()
+
+            clean_branches.append(branch_name)
+
+            if "*" in branch:
+                current_branch = branch_name
+
+            current = " (current)" if "*" in branch else ""
+
+            print(f"{index}. {branch_name}{current}")
+
+        if not clean_branches:
+            print("\nNo branches found.")
+            return
+
+        while True:
+            choice = input(
+                "\nSelect branch number or type 'exit': "
+            ).strip().lower()
+
+            if choice == "exit":
+                return
+
+            if not choice.isdigit():
+                print("\nInvalid selection.")
+                continue
+
+            choice = int(choice)
+
+            if choice < 1 or choice > len(clean_branches):
+                print("\nInvalid selection.")
+                continue
+
+            selected_branch = clean_branches[choice - 1]
+
+            if selected_branch == current_branch:
+                print(
+                    "\nYou are already on that branch."
+                )
+                continue
+
+            break
+
+        print(
+            f"\nSwitching to '{selected_branch}'..."
+        )
+
+        subprocess.run(
+            ["git", "switch", selected_branch],
+            check=True
+        )
+
+        print(
+            f"\nNow on branch '{selected_branch}'."
+        )
+
+    except subprocess.CalledProcessError as e:
+        print(f"\nGit command failed: {e}")
+
+    except FileNotFoundError:
+        print("\nGit is not installed or not in PATH.")
+
+============================================================
+FILE: dev_tools\creation_engine\creator_controller.py
+============================================================
+
+from dev_tools.creation_engine.creator_structure import build_structure
+
+def get_folder_name():
+    return input("\nEnter folder name or type 'done': ").strip()
+
+def get_file_names():
+    files = []
+    while True:
+        file_name = input("\nEnter file name or type 'done': ").strip()
+        
+        if file_name.lower() == "done":
+            break
+            
+        if not file_name:
+            print("\nFile name cannot be empty.")
+            continue
+            
+        files.append({
+            "name": file_name
+        })
+        
+    return files
+
+def run_folder_mode():
+    structure = {}
+    while True:
+        folder_name = get_folder_name()
+        
+        if folder_name.lower() == "done":
+            break
+            
+        if not folder_name:
+            print("\nFolder name cannot be empty.")
+            continue
+            
+        # Add folder with empty list (no files)
+        structure[folder_name] = []
+        
+    if not structure:
+        print("\nNo folders provided.")
+        return
+        
+    build_structure(structure)
+    print("\nFolders created successfully.")
+
+def run_structure_mode():
+    structure = {}
+    while True:
+        folder_name = get_folder_name()
+        
+        if folder_name.lower() == "done":
+            break
+            
+        if not folder_name:
+            print("\nFolder name cannot be empty.")
+            continue
+            
+        # Collect files for the specified folder
+        files = get_file_names()
+        structure[folder_name] = files
+        
+    if not structure:
+        print("\nNo structure provided.")
+        return
+        
+    build_structure(structure)
+    print("\nStructure created successfully.")
+
+def run_template_mode():
+    # Placeholder for future template logic
+    print("\n[Template Mode Placeholder]")
+    print("- Choose template")
+    print("- Enter destination folder name")
+    print("- Enter destination file name if required")
+    print("- Load template")
+    print("- Call build_structure()")
+    print("\nTemplate mode is not fully implemented yet.")
+
+============================================================
+FILE: dev_tools\creation_engine\creator_file.py
+============================================================
+
+from pathlib import Path
+
+
+def create_file(
+    folder_name,
+    file_name,
+    content=""
+):
+    file_path = Path(folder_name) / file_name
+
+    file_path.touch(
+        exist_ok=True
+    )
+
+    if content:
+        file_path.write_text(
+            content,
+            encoding="utf-8"
+        )
+
+    return file_path
+
+============================================================
+FILE: dev_tools\creation_engine\creator_folder.py
+============================================================
+
+from pathlib import Path
+
+
+def create_folder(folder_name):
+    folder_path = Path(folder_name)
+
+    folder_path.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    return folder_path
+
+============================================================
+FILE: dev_tools\creation_engine\creator_structure.py
+============================================================
+
+from dev_tools.creation_engine.creator_folder import (
+    create_folder
+)
+
+from dev_tools.creation_engine.creator_file import (
+    create_file
+)
+
+
+def build_structure(structure):
+    for folder_name, files in structure.items():
+
+        create_folder(folder_name)
+
+        for file_data in files:
+
+            create_file(
+                folder_name,
+                file_data["name"],
+                file_data.get(
+                    "content",
+                    ""
+                )
+            )
+
+============================================================
+FILE: dev_tools\menus\git_menu.py
+============================================================
+
+from dev_tools.commands.commit import run_commit
+from dev_tools.commands.switch import run_switch
+from dev_tools.commands.create_branch import run_create_branch
+
+def git_menu():
+    menu_map = {
+        "1": run_commit,
+        "2": run_switch,
+        "3": run_create_branch
+    }
+    while True:
+        print("\n=== Git Menu ===")
+        print("1. commit")
+        print("2. switch")
+        print("3. new-branch")
+        print("4. back")
+        
+        choice = input("\nSelect an option: ").strip()
+        if choice == "4":
+            break
+            
+        func = menu_map.get(choice)
+        if func:
+            func()
+        else:
+            print("\nInvalid choice.")
+
+============================================================
+FILE: dev_tools\menus\main_menu.py
+============================================================
+
+from dev_tools.menus.git_menu import git_menu
+from dev_tools.menus.structure_menu import structure_menu
+from dev_tools.menus.template_menu import template_menu
+from dev_tools.menus.utilities_menu import utilities_menu
+
+def main_menu():
+    menu_map = {
+        "1": git_menu,
+        "2": structure_menu,
+        "3": template_menu,
+        "4": utilities_menu
+    }
+    while True:
+        print("\n=== Main Menu ===")
+        print("1. Git Commands")
+        print("2. Structure")
+        print("3. Templates")
+        print("4. Utilities")
+        print("5. Exit")
+        
+        choice = input("\nSelect an option: ").strip()
+        if choice == "5":
+            print("\nExiting DevTool.")
+            break
+            
+        func = menu_map.get(choice)
+        if func:
+            func()
+        else:
+            print("\nInvalid choice.")
+
+============================================================
+FILE: dev_tools\menus\structure_menu.py
+============================================================
+
+from dev_tools.creation_engine.creator_controller import (
+    run_folder_mode,
+    run_structure_mode
+)
+
+def structure_menu():
+    menu_map = {
+        "1": run_folder_mode,
+        "2": run_structure_mode
+    }
+    while True:
+        print("\n=== Structure Menu ===")
+        print("1. folder")
+        print("2. structure")
+        print("3. back")
+        
+        choice = input("\nSelect an option: ").strip()
+        if choice == "3":
+            break
+            
+        func = menu_map.get(choice)
+        if func:
+            func()
+        else:
+            print("\nInvalid choice.")
+
+============================================================
+FILE: dev_tools\menus\template_menu.py
+============================================================
+
+def template_menu():
+    while True:
+        print("\n=== Template Menu ===")
+        print("Available templates: None (Placeholder)")
+        print("1. back")
+        
+        choice = input("\nSelect an option: ").strip()
+        if choice == "1":
+            break
+        else:
+            print("\nInvalid choice.")
+
+============================================================
+FILE: dev_tools\menus\utilities_menu.py
+============================================================
+
+from dev_tools.utilities.bundler import run_bundle
+
+def utilities_menu():
+    menu_map = {
+        "1": run_bundle
+    }
+    while True:
+        print("\n=== Utilities Menu ===")
+        print("1. bundle")
+        print("2. back")
+        
+        choice = input("\nSelect an option: ").strip()
+        if choice == "2":
+            break
+            
+        func = menu_map.get(choice)
+        if func:
+            func()
+        else:
+            print("\nInvalid choice.")
+
+============================================================
+FILE: dev_tools\utilities\bundler.py
+============================================================
+
+import os
+from pathlib import Path
+
+
+IGNORED_DIRS = {
+    
+    "node_modules", ".next", "dist", "build", "out", "coverage",
+    
+    "__pycache__", "venv", "env", ".venv", ".tox", ".pytest_cache", ".ruff_cache",
+    
+    "target", "bin", "obj",
+    
+    ".git", ".vscode", ".idea", ".svn", ".DS_Store"
+}
+
+IGNORED_EXTENSIONS = {
+    
+    ".pyc", ".pyo", ".pyd",
+    
+    ".o", ".out", ".exe", ".dll", ".so", ".dylib", ".class",
+    
+    ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".mp4", ".pdf", ".zip", ".tar", ".gz"
+}
+
+IGNORED_FILES = {
+    
+    "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "poetry.lock"
+}
+
+def run_bundle():
+    print("\n=== Bundle Project Context ===")
+    
+    # 1. Get extensions
+    ext_input = input("Enter file extensions to bundle (e.g., .py, .js, .cpp) or type 'all': ").strip().lower()
+    
+    if not ext_input:
+        print("\nOperation cancelled: No extensions provided.")
+        return
+
+    requested_extensions = set()
+    if ext_input != "all":
+        # Parse and format extensions (ensure they start with a dot)
+        raw_exts = [e.strip() for e in ext_input.split(",")]
+        for ext in raw_exts:
+            if not ext.startswith("."):
+                ext = "." + ext
+            requested_extensions.add(ext)
+
+    # 2. Get output file name
+    out_name = input("Enter output file name [default: project_context.txt]: ").strip()
+    if not out_name:
+        out_name = "project_context.txt"
+        
+    output_path = Path(out_name).resolve()
+
+    print(f"\nBundling files into '{out_name}'...")
+    
+    bundled_count = 0
+    
+    try:
+        with open(output_path, "w", encoding="utf-8") as outfile:
+            for root, dirs, files in os.walk("."):
+                # Modify dirs in-place to completely skip ignored directories
+                dirs[:] = [d for d in dirs if d not in IGNORED_DIRS]
+                
+                for file in files:
+                    # Skip completely ignored files (like locks)
+                    if file in IGNORED_FILES:
+                        continue
+                        
+                    path = Path(root) / file
+                    
+                    # Skip ignored extensions
+                    if path.suffix.lower() in IGNORED_EXTENSIONS:
+                        continue
+                        
+                    # Filter by requested extensions
+                    if ext_input != "all" and path.suffix.lower() not in requested_extensions:
+                        continue
+                        
+                    # Prevent bundling the output file into itself!
+                    if path.resolve() == output_path:
+                        continue
+                        
+                    # Try to read and write the file
+                    try:
+                        content = path.read_text(encoding="utf-8")
+                        
+                        # Add a clear header for each file
+                        relative_path = path.relative_to(".")
+                        outfile.write(f"{'=' * 60}\n")
+                        outfile.write(f"FILE: {relative_path}\n")
+                        outfile.write(f"{'=' * 60}\n\n")
+                        outfile.write(content)
+                        outfile.write("\n\n")
+                        
+                        bundled_count += 1
+                    except UnicodeDecodeError:
+                        # Silently skip binary files that slipped through the extension check
+                        continue
+                        
+        print(f"\nBundle complete! Gathered {bundled_count} files into {out_name}.")
+        
+    except Exception as e:
+        print(f"\nAn error occurred while bundling: {e}")
+
