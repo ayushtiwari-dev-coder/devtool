@@ -1,11 +1,11 @@
 import sys
 
 from dev_tools.commands.commit import run_commit
-# from dev_tools.commands.switch import run_switch
+from dev_tools.commands.switch import run_switch
 
 COMMANDS = {
     "commit": run_commit,
-    # "switch": run_switch,
+    "switch":run_switch,
 }
 
 
