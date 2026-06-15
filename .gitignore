@@ -1,6 +1,8 @@
 devtool.egg-info
-__pycache__/*.pyc*.pyo*.pyd
-
+pycache/*.pyc*.pyo*.pyd
+# Python
+__pycache__/
+*.py[cod]
 .venv/venv/
 build/dist/
 
