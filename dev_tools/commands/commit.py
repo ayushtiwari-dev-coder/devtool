@@ -4,6 +4,7 @@ from pathlib import Path
 
 def run_commit():
     try:
+        print("new_version")
         # Repository name
         repo_path = subprocess.check_output(
             ["git", "rev-parse", "--show-toplevel"],
@@ -71,17 +72,59 @@ def run_commit():
             text=True
         )
 
-        if remote.stdout.strip():
+        if not remote.stdout.strip():
+            print(
+                "\nCommit successful. No remote configured, skipping push."
+            )
+            return
+
+        # Check if current branch has an upstream
+        try:
+            subprocess.check_output(
+                [
+                    "git",
+                    "rev-parse",
+                    "--abbrev-ref",
+                    "--symbolic-full-name",
+                    "@{u}"
+                ],
+                stderr=subprocess.DEVNULL,
+                text=True
+            )
+
+            has_upstream = True
+
+        except subprocess.CalledProcessError:
+            has_upstream = False
+
+        if has_upstream:
             print("Running git push")
+
             subprocess.run(
                 ["git", "push"],
                 check=True
             )
-            print("\nCommit and push successful.")
+
         else:
             print(
-                "\nCommit successful. No remote configured, skipping push."
+                f"First push detected for branch '{branch}'."
             )
+            print(
+                f"Running: git push -u origin {branch}"
+            )
+
+            subprocess.run(
+                [
+                    "git",
+                    "push",
+                    "-u",
+                    "origin",
+                    branch
+                ],
+                check=True
+            )
+
+        print("\nCommit and push successful.")
 
     except subprocess.CalledProcessError as e:
         print(f"\nGit command failed: {e}")
